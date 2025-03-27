@@ -1,31 +1,48 @@
 const express = require('express');
-const { exec } = require('child_process');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const app = express();
-const port = process.env.PORT || 3000;
 
-// Endpoint: Tạo cookies mới
 app.get('/get-cookies', async (req, res) => {
-  exec('node get_cookies.js', (error, stdout, stderr) => {
-    if (error) return res.status(500).send(stderr);
-    return res.send('✅ Cookies refreshed');
-  });
-});
-
-// Endpoint: Tải video
-app.get('/download', async (req, res) => {
-  const videoUrl = req.query.url;
-  if (!videoUrl) return res.status(400).send('Thiếu tham số URL');
-
-  const command = `yt-dlp --cookies cookies.txt -f best -o "video.mp4" ${videoUrl}`;
-  exec(command, (error, stdout, stderr) => {
-    if (error) return res.status(500).send(stderr);
-    return res.download('video.mp4', 'video.mp4', () => {
-      fs.unlinkSync('video.mp4');
+  try {
+    console.log("Launching Puppeteer...");
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process'
+      ]
     });
-  });
+
+    const page = await browser.newPage();
+    await page.goto('https://youtube.com', { waitUntil: 'domcontentloaded' });
+
+    const cookies = await page.cookies();
+    await browser.close();
+
+    // Format thành file `.txt` theo định dạng `yt-dlp` yêu cầu
+    const cookieText = cookies.map(c => `${c.name}\t${c.value}`).join('\n');
+
+    // Trả file về client
+    res.setHeader('Content-disposition', 'attachment; filename=youtube_cookies.txt');
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(cookieText);
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).send('Failed to get cookies');
+  }
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+app.get('/', (req, res) => {
+  res.send("Auto Cookie Downloader is running!");
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
