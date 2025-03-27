@@ -2,17 +2,31 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  try {
+    console.log("Starting Puppeteer...");
+    const browser = await puppeteer.launch({
+      headless: 'new', // dùng 'new' cho Puppeteer >= 22
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process'
+      ]
+    });
 
-  await page.goto('https://www.youtube.com', { waitUntil: 'networkidle2' });
+    const page = await browser.newPage();
+    await page.goto('https://youtube.com', { waitUntil: 'domcontentloaded' });
+    console.log("Page loaded. Getting cookies...");
 
-  // (Tùy chọn) Login bằng cookie trước đã lưu hoặc credentials
-  // Hoặc dùng bản công khách nếu chỉ cần bypass bot
+    const cookies = await page.cookies();
+    fs.writeFileSync('cookies.txt', cookies.map(c => `${c.name}\t${c.value}`).join('\n'));
 
-  const cookies = await page.cookies();
-  const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-  fs.writeFileSync('cookies.txt', cookieString);
-  console.log('✅ Cookies updated');
-  await browser.close();
+    await browser.close();
+    console.log("Cookies saved successfully.");
+  } catch (err) {
+    console.error("Error occurred:", err);
+  }
 })();
