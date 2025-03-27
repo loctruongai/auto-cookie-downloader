@@ -1,7 +1,6 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
-
 const app = express();
 
 app.get('/get-cookies', async (req, res) => {
@@ -9,7 +8,7 @@ app.get('/get-cookies', async (req, res) => {
     console.log("🚀 Launching Puppeteer...");
 
     const browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
       args: [
         '--no-sandbox',
@@ -17,31 +16,36 @@ app.get('/get-cookies', async (req, res) => {
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
+        '--single-process',
         '--no-zygote',
-        '--single-process'
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--no-first-run'
       ]
     });
 
     const page = await browser.newPage();
-    await page.goto('https://youtube.com', { waitUntil: 'domcontentloaded' });
-    console.log("✅ Page loaded. Extracting cookies...");
+    await page.goto('https://youtube.com', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    console.log("✅ Page loaded, extracting cookies...");
 
     const cookies = await page.cookies();
     await browser.close();
-    console.log("🧹 Browser closed.");
+    console.log("🎯 Cookies extracted & browser closed.");
 
-    // Format cookie theo chuẩn Netscape cho yt-dlp
+    // Format theo chuẩn yt-dlp
     const cookieText = cookies.map(c =>
       `.youtube.com\tTRUE\t/\tFALSE\t0\t${c.name}\t${c.value}`
     ).join('\n');
 
-    // Trả file về client
-    res.setHeader('Content-Disposition', 'attachment; filename="youtube_cookies.txt"');
+    res.setHeader('Content-disposition', 'attachment; filename=youtube_cookies.txt');
     res.setHeader('Content-Type', 'text/plain');
     res.send(cookieText);
-    console.log("✅ Cookies sent to client.");
   } catch (err) {
-    console.error("❌ Error getting cookies:", err);
+    console.error("❌ Error:", err);
     res.status(500).send('Failed to get cookies');
   }
 });
@@ -52,5 +56,5 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🌐 Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
